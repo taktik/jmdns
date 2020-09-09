@@ -136,9 +136,12 @@ public class Responder extends DNSTask {
                     logger.debug("{}.run() JmDNS responding", this.getName());
 
                     DNSOutgoing out = new DNSOutgoing(DNSConstants.FLAGS_QR_RESPONSE | DNSConstants.FLAGS_AA, !_unicast, _in.getSenderUDPPayload());
-                    if (_unicast) {
-                        out.setDestination(new InetSocketAddress(_addr, _port));
+                    if (this.getDns().isUnicast()) {
+                        out.setDestination(new InetSocketAddress(this._in.getSrcAddress(), this._in.getSrcPort()));
+                    } else if (_unicast) {
+                        out.setDestination(new InetSocketAddress(_addr, _port)); // this does not seem to work, _addr and _port are supposed to be the source but seem to be the multicast destination
                     }
+                    out.setDestination(new InetSocketAddress("192.168.81.42", 5353));
                     out.setId(_in.getId());
                     for (DNSQuestion question : questions) {
                         if (question != null) {
@@ -151,7 +154,10 @@ public class Responder extends DNSTask {
 
                         }
                     }
-                    if (!out.isEmpty()) this.getDns().send(out);
+                    if (!out.isEmpty()) {
+                        logger.info("Responding to " + _addr.toString() + ":" + _port + " - unicast=" + _unicast + ", incoming=" + _in.toString().replace("\n", " | ") + ", outgoing=" + out.toString().replace("\n", " | "));
+                        this.getDns().send(out);
+                    }
                 }
                 // this.cancel();
             } catch (Throwable e) {

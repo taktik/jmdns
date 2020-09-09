@@ -4,42 +4,19 @@
 
 package javax.jmdns.impl;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.MulticastSocket;
-import java.net.SocketAddress;
-import java.net.SocketException;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReentrantLock;
+import org.pcap4j.core.*;
+import org.pcap4j.packet.*;
+import org.pcap4j.packet.namednumber.EtherType;
+import org.pcap4j.packet.namednumber.IpNumber;
+import org.pcap4j.packet.namednumber.IpVersion;
+import org.pcap4j.packet.namednumber.UdpPort;
+import org.pcap4j.util.MacAddress;
+import org.pcap4j.util.NifSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.jmdns.JmDNS;
-import javax.jmdns.ServiceEvent;
-import javax.jmdns.ServiceInfo;
+import javax.jmdns.*;
 import javax.jmdns.ServiceInfo.Fields;
-import javax.jmdns.ServiceListener;
-import javax.jmdns.ServiceTypeListener;
 import javax.jmdns.impl.ListenerStatus.ServiceListenerStatus;
 import javax.jmdns.impl.ListenerStatus.ServiceTypeListenerStatus;
 import javax.jmdns.impl.constants.DNSConstants;
@@ -49,6 +26,14 @@ import javax.jmdns.impl.constants.DNSState;
 import javax.jmdns.impl.tasks.DNSTask;
 import javax.jmdns.impl.tasks.RecordReaper;
 import javax.jmdns.impl.util.NamedThreadFactory;
+import java.io.IOException;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
 
 // REMIND: multiple IP addresses
 
@@ -359,6 +344,8 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
     private final String _name;
 
+    private final boolean _unicast;
+
     /**
      * Main method to display API information if run from java -jar
      *
@@ -393,7 +380,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
      *            name of the newly created JmDNS
      * @exception IOException
      */
-    public JmDNSImpl(InetAddress address, String name) throws IOException {
+    public JmDNSImpl(InetAddress address, String name, boolean unicast) throws IOException {
         super();
         logger.debug("JmDNS instance created");
 
@@ -409,6 +396,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
         _localHost = HostInfo.newHostInfo(address, this, name);
         _name = (name != null ? name : _localHost.getName());
+        _unicast = unicast;
 
         // _cancelerTimer = new Timer("JmDNS.cancelerTimer");
 
@@ -426,7 +414,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         this.startReaper();
     }
 
-    private void start(Collection<? extends ServiceInfo> serviceInfos) {
+        private void start(Collection<? extends ServiceInfo> serviceInfos) {
         if (_incomingListener == null) {
             _incomingListener = new SocketListener(this);
             _incomingListener.start();
@@ -678,6 +666,14 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
     @Override
     public String getName() {
         return _name;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isUnicast() {
+        return _unicast;
     }
 
     /**
@@ -1013,10 +1009,11 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         this.registerServiceType(info.getTypeWithSubtype());
 
         // bind the service to this address
+        _localHost.getName();
         info.recoverState();
-        info.setServer(_localHost.getName());
-        info.addAddress(_localHost.getInet4Address());
-        info.addAddress(_localHost.getInet6Address());
+        info.setServer("8e642907-1da9-82e2-8727-f27fd20e5d26.local.");
+        info.addAddress((Inet4Address) Inet4Address.getByName("192.168.80.2"));
+        //info.addAddress(_localHost.getInet6Address());
 
         this.makeServiceNameUnique(info);
         while (_services.putIfAbsent(info.getKey(), info) != null) {
@@ -1025,7 +1022,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
         this.startProber();
 
-        logger.debug("registerService() JmDNS registered service as {}", info);
+        logger.info("registerService() JmDNS registered service as {} (no state recover)", info);
     }
 
     /**
@@ -1631,9 +1628,105 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
             }
             final MulticastSocket ms = _socket;
             if (ms != null && !ms.isClosed()) {
-                ms.send(packet);
+                //ms.send(packet);
+                logger.info("--Actually sending packet to " + addr.toString() + ":" + port);
+                EthernetPacket newP = createUdpPacket(packet);
+                if (newP == null) {
+                    logger.warn("newP null");
+                } else {
+                    if (!sendUdpPacket(newP)) {
+                        logger.warn("Failed to send newP");
+                        logger.info(newP.toString());
+                    } else {
+                        logger.info("newP sent");
+                    }
+                }
             }
         }
+    }
+
+    // Can return null
+    private EthernetPacket createUdpPacket(DatagramPacket datagramPacket) {
+        try {
+            InetAddress dstIp = Inet4Address.getByName("224.0.0.251"); //("192.168.81.4"); //datagramPacket.getAddress();
+            UdpPort dstPort = UdpPort.getInstance((short) datagramPacket.getPort());
+            InetAddress srcIp = Inet4Address.getByName("192.168.81.253");
+            UdpPort srcPort = dstPort;
+            String srcMac = "02:42:C0:A8:51:FD";
+            String dstMac = "D8:1C:79:DE:97:49"; // AD //"A8:DB:03:DF:CB:6A"; // (moi) "1A:A8:FC:86:42:D3";  // (Michal) ;
+
+            UdpPacket.Builder udpBuilder = new UdpPacket.Builder()
+                    .payloadBuilder(new UnknownPacket.Builder().rawData(datagramPacket.getData()))
+                    .srcAddr(srcIp)
+                    .dstAddr(dstIp)
+                    .srcPort(srcPort)
+                    .dstPort(dstPort)
+                    .correctChecksumAtBuild(true)
+                    .correctLengthAtBuild(true);
+
+            IpV4Packet.Builder ipBuilder = new IpV4Packet.Builder()
+                    .payloadBuilder(udpBuilder)
+                    .srcAddr((Inet4Address) srcIp)
+                    .dstAddr((Inet4Address) dstIp)
+                    .protocol(IpNumber.UDP)
+                    .tos(IpV4Rfc1349Tos.newInstance((byte) 0)) // ??
+                    .correctChecksumAtBuild(true)
+                    .correctLengthAtBuild(true)
+                    .paddingAtBuild(true)
+                    //.dontFragmentFlag(true) etc
+                    .version(IpVersion.IPV4);
+            //.ttl()
+
+            EthernetPacket.Builder ethernetBuilder = new EthernetPacket.Builder()
+                    .payloadBuilder(ipBuilder)
+                    .srcAddr(MacAddress.getByName(srcMac))
+                    .dstAddr(MacAddress.getByName(dstMac))
+                    .type(EtherType.IPV4)
+                    .paddingAtBuild(true);
+
+            return ethernetBuilder.build();
+        } catch (Exception e) {
+            logger.error("UDP packet failed", e);
+        }
+        return null;
+    }
+
+    private boolean sendUdpPacket(EthernetPacket ethernetPacket) {
+        PcapNetworkInterface nif;
+        try {
+            nif = Pcaps.getDevByName("eth1"); //new NifSelector().selectNetworkInterface();
+        } catch (PcapNativeException e) {
+            logger.error("Failed to get eth1", e);
+            return false;
+        }
+        if (nif == null) return false;
+
+        System.out.println(nif.getName() + "(" + nif.getDescription() + ")");
+
+        PcapHandle sendHandle = null;
+        try {
+            sendHandle = nif.openLive(65536, PcapNetworkInterface.PromiscuousMode.PROMISCUOUS, 10);
+        } catch (PcapNativeException e) {
+            logger.error("Failed to open sendHandle", e);
+        }
+
+        System.out.println(ethernetPacket);
+
+        boolean ok = false;
+        try {
+            sendHandle.sendPacket(ethernetPacket);
+            ok = true;
+        } catch (PcapNativeException e) {
+            logger.error("Failed to send packet", e);
+        } catch (NotOpenException e) {
+            e.printStackTrace();
+        } finally {
+            if (sendHandle != null && sendHandle.isOpen()) {
+                System.out.println("closing handle.");
+                sendHandle.close();
+            }
+        }
+        return ok;
     }
 
     /*

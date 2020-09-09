@@ -2,7 +2,7 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.jmdns</groupId>
-	<artifactId>jmdns</artifactId>
+	<artifactId>jmdns-taktik</artifactId>
 	<version>3.5.6-SNAPSHOT</version>
 	<name>JmDNS</name>
 	<packaging>jar</packaging>
@@ -27,16 +27,12 @@ The project was originally started in December 2002 by Arthur van Hoff at Strang
 		<developerConnection>scm:git:https://github.com/jmdns/jmdns.git</developerConnection>
 		<url>https://github.com/jmdns/jmdns.git</url>
 	</scm>
-    <distributionManagement>
-        <repository>
-            <id>bintray</id>
-            <url>https://api.bintray.com/maven/jmdns/mvn/jmdns/;publish=1</url>
-        </repository>
-        <snapshotRepository>
-            <id>jfrog</id>
-            <url>https://oss.jfrog.org/artifactory/oss-snapshot-local</url>
-        </snapshotRepository>
-    </distributionManagement>
+	<distributionManagement>
+		<repository>
+			<id>internal.repo</id>
+			<url>https://maven.taktik.be/content/repositories/snapshots/</url>
+		</repository>
+	</distributionManagement>
 	<issueManagement>
 		<system>github</system>
 		<url>https://github.com/jmdns/jmdns/issues</url>
@@ -48,6 +44,17 @@ The project was originally started in December 2002 by Arthur van Hoff at Strang
 			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
 		</license>
 	</licenses>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.ardikars.pcap</groupId>
+				<artifactId>pcap</artifactId>
+				<version>0.1.7</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -65,6 +72,20 @@ The project was originally started in December 2002 by Arthur van Hoff at Strang
 			<artifactId>easymock</artifactId>
 			<version>3.3.1</version>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.ardikars.pcap</groupId>
+			<artifactId>pcap-codec</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.pcap4j</groupId>
+			<artifactId>pcap4j-core</artifactId>
+			<version>1.8.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.pcap4j</groupId>
+			<artifactId>pcap4j-packetfactory-static</artifactId>
+			<version>1.8.2</version>
 		</dependency>
 	</dependencies>
 	<build>

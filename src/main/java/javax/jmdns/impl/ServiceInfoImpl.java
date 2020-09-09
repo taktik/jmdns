@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -455,7 +456,7 @@ public class ServiceInfoImpl extends ServiceInfo implements DNSListener, DNSStat
      * @param server
      *            the server to set
      */
-    void setServer(String server) {
+    public void setServer(String server) {
         this._server = server;
     }
 
@@ -498,7 +499,7 @@ public class ServiceInfoImpl extends ServiceInfo implements DNSListener, DNSStat
      * @param addr
      *            the addr to add
      */
-    void addAddress(Inet6Address addr) {
+    public void addAddress(Inet6Address addr) {
         _ipv6Addresses.add(addr);
     }
 
@@ -1242,9 +1243,14 @@ public class ServiceInfoImpl extends ServiceInfo implements DNSListener, DNSStat
                 list.add(new Pointer(this.getTypeWithSubtype(), DNSRecordClass.CLASS_IN, DNSRecordClass.NOT_UNIQUE, ttl, this.getQualifiedName()));
             }
             list.add(new Pointer(this.getType(), DNSRecordClass.CLASS_IN, DNSRecordClass.NOT_UNIQUE, ttl, this.getQualifiedName()));
-            list.add(new Service(this.getQualifiedName(), DNSRecordClass.CLASS_IN, unique, ttl, _priority, _weight, _port, localHost.getName()));
+            list.add(new Service(this.getQualifiedName(), DNSRecordClass.CLASS_IN, unique, ttl, _priority, _weight, _port, "8e642907-1da9-82e2-8727-f27fd20e5d26.local."));
             list.add(new Text(this.getQualifiedName(), DNSRecordClass.CLASS_IN, unique, ttl, this.getTextBytes()));
-        }
+            try {
+                list.add(new DNSRecord.IPv4Address("8e642907-1da9-82e2-8727-f27fd20e5d26.local.", DNSRecordClass.CLASS_IN, unique, ttl, Inet4Address.getByName("192.168.80.2")));
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+        } // TODO SH or here
         return list;
     }
 

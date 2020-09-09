@@ -5,6 +5,7 @@
 package javax.jmdns.impl.tasks.state;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Timer;
 
 import javax.jmdns.impl.DNSOutgoing;
@@ -102,6 +103,7 @@ public class Announcer extends DNSStateTask {
         for (DNSRecord answer : this.getDns().getLocalHost().answers(DNSRecordClass.CLASS_ANY, DNSRecordClass.UNIQUE, this.getTTL())) {
             newOut = this.addAnswer(newOut, null, answer);
         }
+        newOut.setDestination(new InetSocketAddress("192.168.81.42", 5353));
         return newOut;
     }
 
@@ -115,6 +117,7 @@ public class Announcer extends DNSStateTask {
         for (DNSRecord answer : info.answers(DNSRecordClass.CLASS_ANY, DNSRecordClass.UNIQUE, this.getTTL(), this.getDns().getLocalHost())) {
             newOut = this.addAnswer(newOut, null, answer);
         }
+        newOut.setDestination(new InetSocketAddress("192.168.81.42", 5353));
         return newOut;
     }
 

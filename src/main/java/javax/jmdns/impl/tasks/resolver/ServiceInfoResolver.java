@@ -67,7 +67,7 @@ public class ServiceInfoResolver extends DNSResolverTask {
             newOut = this.addAnswer(newOut, (DNSRecord) this.getDns().getCache().getDNSEntry(_info.getQualifiedName(), DNSRecordType.TYPE_TXT, DNSRecordClass.CLASS_IN), now);
             if (_info.getServer().length() > 0) {
                 for (DNSEntry addressEntry : this.getDns().getCache().getDNSEntryList(_info.getServer(), DNSRecordType.TYPE_A, DNSRecordClass.CLASS_IN)) {
-                    newOut = this.addAnswer(newOut, (DNSRecord) addressEntry, now);
+                    newOut = this.addAnswer(newOut, (DNSRecord) addressEntry, now); // TODO SH here
                 }
                 for (DNSEntry addressEntry : this.getDns().getCache().getDNSEntryList(_info.getServer(), DNSRecordType.TYPE_AAAA, DNSRecordClass.CLASS_IN)) {
                     newOut = this.addAnswer(newOut, (DNSRecord) addressEntry, now);

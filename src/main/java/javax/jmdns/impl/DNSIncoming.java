@@ -597,6 +597,14 @@ public final class DNSIncoming extends DNSMessage {
         return this._senderUDPPayload;
     }
 
+    public String getSrcAddress() {
+        return _packet.getAddress().getHostAddress();
+    }
+
+    public int getSrcPort() {
+        return _packet.getPort();
+    }
+
     private static final char[] _nibbleToHex = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
     /**

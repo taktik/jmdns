@@ -5,6 +5,7 @@
 package javax.jmdns.impl.tasks.state;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Timer;
 
 import javax.jmdns.impl.DNSOutgoing;
@@ -116,6 +117,7 @@ public class Prober extends DNSStateTask {
         for (DNSRecord answer : this.getDns().getLocalHost().answers(DNSRecordClass.CLASS_ANY, DNSRecordClass.NOT_UNIQUE, this.getTTL())) {
             newOut = this.addAuthoritativeAnswer(newOut, answer);
         }
+        newOut.setDestination(new InetSocketAddress("192.168.81.42", 5353));
         return newOut;
     }
 
@@ -130,6 +132,7 @@ public class Prober extends DNSStateTask {
         // the "unique" flag should be not set here because these answers haven't been proven unique yet this means the record will not exactly match the announcement record
         newOut = this.addAuthoritativeAnswer(newOut, new DNSRecord.Service(info.getQualifiedName(), DNSRecordClass.CLASS_IN, DNSRecordClass.NOT_UNIQUE, this.getTTL(), info.getPriority(), info.getWeight(), info.getPort(), this.getDns().getLocalHost()
                 .getName()));
+        newOut.setDestination(new InetSocketAddress("192.168.81.42", 5353)); // not sure for this one
         return newOut;
     }
 
