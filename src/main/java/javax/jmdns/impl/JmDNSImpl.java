@@ -11,7 +11,6 @@ import org.pcap4j.packet.namednumber.IpNumber;
 import org.pcap4j.packet.namednumber.IpVersion;
 import org.pcap4j.packet.namednumber.UdpPort;
 import org.pcap4j.util.MacAddress;
-import org.pcap4j.util.NifSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +80,11 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
     /**
      * This hashtable holds the services that have been registered. Keys are instances of String which hold an all lower-case version of the fully qualified service name. Values are instances of ServiceInfo.
      */
-    private final ConcurrentMap<String, ServiceInfo> _services;
+    private final ConcurrentMap<String, ServiceInfo> _services; // TODO SH check for other uses of _services and do the same for _macAddresses
+
+    public final ConcurrentMap<Inet4Address, MacAddress> macAddressBySrcIpAddress;
+
+    public final ConcurrentMap<Inet4Address, String> serviceInfoBySrcIpAddress;
 
     /**
      * This hashtable holds the service types that have been registered or that have been received in an incoming datagram.<br/>
@@ -393,6 +396,8 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
         _services = new ConcurrentHashMap<String, ServiceInfo>(20);
         _serviceTypes = new ConcurrentHashMap<String, ServiceTypeEntry>(20);
+        macAddressBySrcIpAddress = new ConcurrentHashMap<Inet4Address, MacAddress>(20);
+        serviceInfoBySrcIpAddress = new ConcurrentHashMap<Inet4Address, String>(20);
 
         _localHost = HostInfo.newHostInfo(address, this, name);
         _name = (name != null ? name : _localHost.getName());
@@ -1009,16 +1014,57 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         this.registerServiceType(info.getTypeWithSubtype());
 
         // bind the service to this address
-        _localHost.getName();
         info.recoverState();
-        info.setServer("8e642907-1da9-82e2-8727-f27fd20e5d26.local.");
-        info.addAddress((Inet4Address) Inet4Address.getByName("192.168.80.2"));
-        //info.addAddress(_localHost.getInet6Address());
+        info.setServer(_localHost.getName());
+        info.addAddress(_localHost.getInet4Address());
+        info.addAddress(_localHost.getInet6Address());
 
         this.makeServiceNameUnique(info);
         while (_services.putIfAbsent(info.getKey(), info) != null) {
             this.makeServiceNameUnique(info);
         }
+
+        this.startProber();
+
+        logger.info("registerService() JmDNS registered service as {} (no state recover)", info);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void registerService(ServiceInfo infoAbstract, String server, Inet4Address serverIpAddress, Inet4Address srcAddress, MacAddress srcMacAddress) throws IOException {
+        if (this.isClosing() || this.isClosed()) {
+            throw new IllegalStateException("This DNS is closed.");
+        }
+        final ServiceInfoImpl info = (ServiceInfoImpl) infoAbstract;
+
+        if (info.getDns() != null) {
+            if (info.getDns() != this) {
+                throw new IllegalStateException("A service information can only be registered with a single instamce of JmDNS.");
+            } else if (_services.get(info.getKey()) != null) {
+                throw new IllegalStateException("A service information can only be registered once.");
+            }
+        }
+        info.setDns(this);
+
+        this.registerServiceType(info.getTypeWithSubtype());
+
+        // bind the service to this address
+        _localHost.getName();
+        info.recoverState();
+        //info.setServer("8e642907-1da9-82e2-8727-f27fd20e5d26.local."); // !! dashes -
+        //info.addAddress((Inet4Address) Inet4Address.getByName("192.168.80.2"));
+        //info.addAddress(_localHost.getInet6Address());
+        info.setServer(server);
+        info.addAddress(serverIpAddress);
+
+        this.makeServiceNameUnique(info);
+        while (_services.putIfAbsent(info.getKey(), info) != null) {
+            this.makeServiceNameUnique(info);
+        }
+        macAddressBySrcIpAddress.put(srcAddress, srcMacAddress);
+        serviceInfoBySrcIpAddress.put(srcAddress, info.getKey());
 
         this.startProber();
 
@@ -1628,17 +1674,20 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
             }
             final MulticastSocket ms = _socket;
             if (ms != null && !ms.isClosed()) {
-                //ms.send(packet);
-                logger.info("--Actually sending packet to " + addr.toString() + ":" + port);
-                EthernetPacket newP = createUdpPacket(packet);
-                if (newP == null) {
-                    logger.warn("newP null");
+                if (!this.getDns().isUnicast()) {
+                    ms.send(packet);
                 } else {
-                    if (!sendUdpPacket(newP)) {
-                        logger.warn("Failed to send newP");
-                        logger.info(newP.toString());
+                    logger.info("Actually sending packet to " + addr.toString() + ":" + port);
+                    EthernetPacket newP = createUdpPacket(packet);
+                    if (newP == null) {
+                        logger.trace("newP null");
                     } else {
-                        logger.info("newP sent");
+                        if (!sendUdpPacket(newP)) {
+                            logger.warn("Failed to send newP");
+                            logger.info(newP.toString());
+                        } else {
+                            logger.info("newP sent");
+                        }
                     }
                 }
             }
@@ -1648,12 +1697,27 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
     // Can return null
     private EthernetPacket createUdpPacket(DatagramPacket datagramPacket) {
         try {
+//            Iterator<ServiceInfo> it = this.getDns().getServices().values().iterator();
+//            while (it.hasNext()) {
+//                ServiceInfo s = it.next();
+//                for (int i = 0 ; i < s.getInet4Addresses().length ; i++) {
+//                    if (s.getInet4Addresses()[i].getHostAddress().equals(datagramPacket.getAddress().getHostAddress())) {
+//
+//                    }
+//                }
+//            }
             InetAddress dstIp = Inet4Address.getByName("224.0.0.251"); //("192.168.81.4"); //datagramPacket.getAddress();
             UdpPort dstPort = UdpPort.getInstance((short) datagramPacket.getPort());
             InetAddress srcIp = Inet4Address.getByName("192.168.81.253");
             UdpPort srcPort = dstPort;
             String srcMac = "02:42:C0:A8:51:FD";
-            String dstMac = "D8:1C:79:DE:97:49"; // AD //"A8:DB:03:DF:CB:6A"; // (moi) "1A:A8:FC:86:42:D3";  // (Michal) ;
+            MacAddress nullableDstMac = macAddressBySrcIpAddress.get((Inet4Address) datagramPacket.getAddress()); //"A8:DB:03:DF:CB:6A"; // (moi) "D8:1C:79:DE:97:49"; // AD // "1A:A8:FC:86:42:D3";  // (Michal) ;
+            if (nullableDstMac == null) {
+                if (!datagramPacket.getAddress().getHostAddress().equals("224.0.0.251")) logger.info("Null mac for ip " + datagramPacket.getAddress().toString());
+                return null;
+            }
+            String dstMac = nullableDstMac.toString();
+            logger.info("Mac for ip " + datagramPacket.getAddress().toString() + " is " + dstMac);
 
             UdpPacket.Builder udpBuilder = new UdpPacket.Builder()
                     .payloadBuilder(new UnknownPacket.Builder().rawData(datagramPacket.getData()))
@@ -1701,7 +1765,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         }
         if (nif == null) return false;
 
-        System.out.println(nif.getName() + "(" + nif.getDescription() + ")");
+        logger.debug(nif.getName() + "(" + nif.getDescription() + ")");
 
         PcapHandle sendHandle = null;
         try {
@@ -1710,7 +1774,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
             logger.error("Failed to open sendHandle", e);
         }
 
-        System.out.println(ethernetPacket);
+        //logger.debug(ethernetPacket);
 
         boolean ok = false;
         try {

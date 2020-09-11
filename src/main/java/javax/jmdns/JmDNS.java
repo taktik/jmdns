@@ -4,9 +4,12 @@
 
 package javax.jmdns;
 
+import org.pcap4j.util.MacAddress;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.Collection;
 import java.util.Map;
@@ -355,7 +358,9 @@ public abstract class JmDNS implements Closeable {
      * @exception IOException
      *                if there is an error in the underlying protocol, such as a TCP error.
      */
-    public abstract void registerService(ServiceInfo info) throws IOException;
+    public abstract void registerService(ServiceInfo infoAbstract) throws IOException;
+
+    public abstract void registerService(ServiceInfo infoAbstract, String server, Inet4Address ipAddress, Inet4Address srcAddress, MacAddress srcMacAddress) throws IOException;
 
     /**
      * Unregister a service. The service should have been registered.

@@ -217,11 +217,12 @@ public class HostInfo implements DNSStatefulObject {
 
     private DNSRecord.Address getDNS4AddressRecord(boolean unique, int ttl) {
         if (this.getInetAddress() instanceof Inet4Address) {
-            try {
-                return new DNSRecord.IPv4Address("8e642907-1da9-82e2-8727-f27fd20e5d26.local.", DNSRecordClass.CLASS_IN, unique, ttl, Inet4Address.getByName("192.168.80.2"));
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            }
+            return new DNSRecord.IPv4Address(this.getName(), DNSRecordClass.CLASS_IN, unique, ttl, this.getInetAddress());
+//            try {
+//                return new DNSRecord.IPv4Address("8e642907-1da9-82e2-8727-f27fd20e5d26.local.", DNSRecordClass.CLASS_IN, unique, ttl, Inet4Address.getByName("192.168.80.2"));
+//            } catch (UnknownHostException e) {
+//                e.printStackTrace();
+//            }
         }
         return null;
     }

@@ -128,6 +128,7 @@ public abstract class DNSStateTask extends DNSTask {
             }
             if (!out.isEmpty()) {
                 logger.debug("{}.run() JmDNS {} #{}", this.getName(), this.getTaskDescription(), this.getTaskState());
+
                 this.getDns().send(out);
 
                 // Advance the state of objects.

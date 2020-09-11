@@ -4,14 +4,15 @@
 
 package javax.jmdns.impl.tasks;
 
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Timer;
+import java.util.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.jmdns.ServiceInfo;
 import javax.jmdns.impl.DNSIncoming;
 import javax.jmdns.impl.DNSOutgoing;
 import javax.jmdns.impl.DNSQuestion;
@@ -102,7 +103,8 @@ public class Responder extends DNSTask {
     @Override
     public void run() {
         this.getDns().respondToQuery(_in);
-
+        String srcAddress = _in.getSrcAddress();
+        int srcPort = _in.getSrcPort();
         // We use these sets to prevent duplicate records
         Set<DNSQuestion> questions = new HashSet<DNSQuestion>();
         Set<DNSRecord> answers = new HashSet<DNSRecord>();
@@ -122,6 +124,8 @@ public class Responder extends DNSTask {
                     question.addAnswers(this.getDns(), answers);
                 }
 
+                logger.info("Found " + answers.size() + " answers for IP " + srcAddress);
+
                 // remove known answers, if the TTL is at least half of the correct value. (See Draft Cheshire chapter 7.1.).
                 long now = System.currentTimeMillis();
                 for (DNSRecord knownAnswer : _in.getAnswers()) {
@@ -131,17 +135,32 @@ public class Responder extends DNSTask {
                     }
                 }
 
+                // Remove answers from services that are not paired to that IP (could be better to just not add them at all!)
+                String serviceKeyMatchingSrcIp = this.getDns().serviceInfoBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress));
+                if (this.getDns().isUnicast()) {
+                    List<DNSRecord> toRemove = new ArrayList<DNSRecord>();
+                    ServiceInfo s = serviceKeyMatchingSrcIp != null ? this.getDns().getServices().get(serviceKeyMatchingSrcIp) : null;
+                    String idWithDashes = s != null ? s.getServer() : null;
+                    for (DNSRecord answer : answers) {
+                        if (idWithDashes == null || !answer.getServiceInfo().getKey().contains(idWithDashes) && !answer.getServiceInfo().getKey().contains(idWithDashes.replace("-", ""))) {
+                            toRemove.add(answer);
+                        }
+                    }
+                    logger.info("Pruning " + toRemove.size() + " answers for IP " + srcAddress + " out of " + answers.size() + " ; serviceKeyMatchingSrcIp=" + serviceKeyMatchingSrcIp + " ; this.getDns().serviceInfoBySrcIpAddress=" + this.getDns().serviceInfoBySrcIpAddress.keySet().toString() + "-" + this.getDns().serviceInfoBySrcIpAddress.values().toString());
+                    answers.removeAll(toRemove);
+                }
+
                 // respond if we have answers
                 if (!answers.isEmpty()) {
                     logger.debug("{}.run() JmDNS responding", this.getName());
 
                     DNSOutgoing out = new DNSOutgoing(DNSConstants.FLAGS_QR_RESPONSE | DNSConstants.FLAGS_AA, !_unicast, _in.getSenderUDPPayload());
                     if (this.getDns().isUnicast()) {
-                        out.setDestination(new InetSocketAddress(this._in.getSrcAddress(), this._in.getSrcPort()));
+                        out.setDestination(new InetSocketAddress(srcAddress, srcPort));
                     } else if (_unicast) {
                         out.setDestination(new InetSocketAddress(_addr, _port)); // this does not seem to work, _addr and _port are supposed to be the source but seem to be the multicast destination
                     }
-                    out.setDestination(new InetSocketAddress("192.168.81.42", 5353));
+                    //out.setDestination(new InetSocketAddress("192.168.81.42", 5353));
                     out.setId(_in.getId());
                     for (DNSQuestion question : questions) {
                         if (question != null) {
@@ -155,7 +174,10 @@ public class Responder extends DNSTask {
                         }
                     }
                     if (!out.isEmpty()) {
-                        logger.info("Responding to " + _addr.toString() + ":" + _port + " - unicast=" + _unicast + ", incoming=" + _in.toString().replace("\n", " | ") + ", outgoing=" + out.toString().replace("\n", " | "));
+                        if (this.getDns().isUnicast()) {
+                            logger.info("Responding to " + _addr.toString() + ":" + _port + " - unicast=" + _unicast + ", incoming=" + _in.toString().replace("\n", " | ") + ", outgoing=" + out.toString().replace("\n", " | "));
+                            logger.info("Should be equal: " + _in.getSrcAddress() + " = " + srcAddress + " -> " + serviceKeyMatchingSrcIp + " = " + this.getDns().serviceInfoBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress)));
+                        }
                         this.getDns().send(out);
                     }
                 }

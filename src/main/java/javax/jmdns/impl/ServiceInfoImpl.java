@@ -1243,13 +1243,14 @@ public class ServiceInfoImpl extends ServiceInfo implements DNSListener, DNSStat
                 list.add(new Pointer(this.getTypeWithSubtype(), DNSRecordClass.CLASS_IN, DNSRecordClass.NOT_UNIQUE, ttl, this.getQualifiedName()));
             }
             list.add(new Pointer(this.getType(), DNSRecordClass.CLASS_IN, DNSRecordClass.NOT_UNIQUE, ttl, this.getQualifiedName()));
-            list.add(new Service(this.getQualifiedName(), DNSRecordClass.CLASS_IN, unique, ttl, _priority, _weight, _port, "8e642907-1da9-82e2-8727-f27fd20e5d26.local."));
+            list.add(new Service(this.getQualifiedName(), DNSRecordClass.CLASS_IN, unique, ttl, _priority, _weight, _port, _server)); //"8e642907-1da9-82e2-8727-f27fd20e5d26.local."));
             list.add(new Text(this.getQualifiedName(), DNSRecordClass.CLASS_IN, unique, ttl, this.getTextBytes()));
-            try {
-                list.add(new DNSRecord.IPv4Address("8e642907-1da9-82e2-8727-f27fd20e5d26.local.", DNSRecordClass.CLASS_IN, unique, ttl, Inet4Address.getByName("192.168.80.2")));
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            }
+//            try {
+                if (_ipv4Addresses.iterator().hasNext()) list.add(new DNSRecord.IPv4Address(_server, DNSRecordClass.CLASS_IN, unique, ttl, _ipv4Addresses.iterator().next())); //Inet4Address.getByName("192.168.80.2")));
+                //list.add(new DNSRecord.IPv4Address("8e642907-1da9-82e2-8727-f27fd20e5d26.local.", DNSRecordClass.CLASS_IN, unique, ttl, Inet4Address.getByName("192.168.80.2")));
+//            } catch (UnknownHostException e) {
+//                e.printStackTrace();
+//            }
         } // TODO SH or here
         return list;
     }
