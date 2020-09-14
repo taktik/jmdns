@@ -25,6 +25,7 @@ import javax.jmdns.impl.constants.DNSState;
 import javax.jmdns.impl.tasks.DNSTask;
 import javax.jmdns.impl.tasks.RecordReaper;
 import javax.jmdns.impl.util.NamedThreadFactory;
+import javax.jmdns.impl.util.Pair;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
@@ -80,11 +81,11 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
     /**
      * This hashtable holds the services that have been registered. Keys are instances of String which hold an all lower-case version of the fully qualified service name. Values are instances of ServiceInfo.
      */
-    private final ConcurrentMap<String, ServiceInfo> _services; // TODO SH check for other uses of _services and do the same for _macAddresses
+    private final ConcurrentMap<String, ServiceInfo> _services;
 
     public final ConcurrentMap<Inet4Address, MacAddress> macAddressBySrcIpAddress;
 
-    public final ConcurrentMap<Inet4Address, String> serviceInfoBySrcIpAddress;
+    public final ConcurrentMap<Inet4Address, List<String>> serviceInfosBySrcIpAddress;
 
     /**
      * This hashtable holds the service types that have been registered or that have been received in an incoming datagram.<br/>
@@ -397,7 +398,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         _services = new ConcurrentHashMap<String, ServiceInfo>(20);
         _serviceTypes = new ConcurrentHashMap<String, ServiceTypeEntry>(20);
         macAddressBySrcIpAddress = new ConcurrentHashMap<Inet4Address, MacAddress>(20);
-        serviceInfoBySrcIpAddress = new ConcurrentHashMap<Inet4Address, String>(20);
+        serviceInfosBySrcIpAddress = new ConcurrentHashMap<Inet4Address, List<String>>(20);
 
         _localHost = HostInfo.newHostInfo(address, this, name);
         _name = (name != null ? name : _localHost.getName());
@@ -1026,7 +1027,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
         this.startProber();
 
-        logger.info("registerService() JmDNS registered service as {} (no state recover)", info);
+        logger.info("registerService() JmDNS registered service as {}", info);
     }
 
     /**
@@ -1051,7 +1052,6 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         this.registerServiceType(info.getTypeWithSubtype());
 
         // bind the service to this address
-        _localHost.getName();
         info.recoverState();
         //info.setServer("8e642907-1da9-82e2-8727-f27fd20e5d26.local."); // !! dashes -
         //info.addAddress((Inet4Address) Inet4Address.getByName("192.168.80.2"));
@@ -1059,16 +1059,23 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         info.setServer(server);
         info.addAddress(serverIpAddress);
 
+        macAddressBySrcIpAddress.put(srcAddress, srcMacAddress);
+        List<String> serviceKeys = serviceInfosBySrcIpAddress.get(srcAddress);
+        if (serviceKeys != null) serviceKeys.add(info.getKey());
+        else {
+            List<String> l = new ArrayList<String>();
+            l.add(info.getKey());
+            serviceInfosBySrcIpAddress.put(srcAddress, l);
+        }
+
         this.makeServiceNameUnique(info);
         while (_services.putIfAbsent(info.getKey(), info) != null) {
             this.makeServiceNameUnique(info);
         }
-        macAddressBySrcIpAddress.put(srcAddress, srcMacAddress);
-        serviceInfoBySrcIpAddress.put(srcAddress, info.getKey());
 
         this.startProber();
 
-        logger.info("registerService() JmDNS registered service as {} (no state recover)", info);
+        logger.info("registerService() JmDNS registered service as {}", info);
     }
 
     /**
@@ -1084,6 +1091,25 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
             info.waitForCanceled(DNSConstants.CLOSE_TIMEOUT);
 
             _services.remove(info.getKey(), info);
+
+            List<Pair<String, Inet4Address>> toRemove = new ArrayList<Pair<String, Inet4Address>>();
+            for (Map.Entry<Inet4Address, List<String>> entry: serviceInfosBySrcIpAddress.entrySet()) {
+                if (entry.getValue().contains(info.getKey())) {
+                    toRemove.add(new Pair<String, Inet4Address>(info.getKey(), entry.getKey()));
+                }
+            }
+            for (Pair<String, Inet4Address> pairToRemove: toRemove) {
+                List<String> services = serviceInfosBySrcIpAddress.get(pairToRemove.second);
+                services.remove(pairToRemove.first);
+                if (services.isEmpty()) {
+                    serviceInfosBySrcIpAddress.remove(pairToRemove.second);
+                    macAddressBySrcIpAddress.remove(pairToRemove.second);
+                    logger.info("Unregistered " + pairToRemove.first + " (" + pairToRemove.second + "), and removed MAC matching");
+                } else { // keep other services and MAC matching
+                    logger.info("Unregistered " + pairToRemove.first + " (" + pairToRemove.second + "), but there are remaining services: " + services);
+                }
+            }
+
             logger.debug("unregisterService() JmDNS {} unregistered service as {}", this.getName(), info);
         } else {
             logger.warn("{} removing unregistered service info: {}", this.getName(), infoAbstract.getKey());
@@ -1117,7 +1143,8 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
                 _services.remove(name, info);
             }
         }
-
+        macAddressBySrcIpAddress.clear();
+        serviceInfosBySrcIpAddress.clear();
     }
 
     /**
@@ -1677,7 +1704,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
                 if (!this.getDns().isUnicast()) {
                     ms.send(packet);
                 } else {
-                    logger.info("Actually sending packet to " + addr.toString() + ":" + port);
+                    //logger.info("Actually sending packet to " + addr.toString() + ":" + port); // is the renewer for local ip...
                     EthernetPacket newP = createUdpPacket(packet);
                     if (newP == null) {
                         logger.trace("newP null");

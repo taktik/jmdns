@@ -1251,7 +1251,7 @@ public class ServiceInfoImpl extends ServiceInfo implements DNSListener, DNSStat
 //            } catch (UnknownHostException e) {
 //                e.printStackTrace();
 //            }
-        } // TODO SH or here
+        }
         return list;
     }
 

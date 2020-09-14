@@ -124,7 +124,7 @@ public class Responder extends DNSTask {
                     question.addAnswers(this.getDns(), answers);
                 }
 
-                logger.info("Found " + answers.size() + " answers for IP " + srcAddress);
+                if (this.getDns().isUnicast()) logger.info("Found " + answers.size() + " answers for IP " + srcAddress);
 
                 // remove known answers, if the TTL is at least half of the correct value. (See Draft Cheshire chapter 7.1.).
                 long now = System.currentTimeMillis();
@@ -136,17 +136,26 @@ public class Responder extends DNSTask {
                 }
 
                 // Remove answers from services that are not paired to that IP (could be better to just not add them at all!)
-                String serviceKeyMatchingSrcIp = this.getDns().serviceInfoBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress));
+                List<String> serviceKeysMatchingSrcIp = this.getDns().serviceInfosBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress));
                 if (this.getDns().isUnicast()) {
                     List<DNSRecord> toRemove = new ArrayList<DNSRecord>();
-                    ServiceInfo s = serviceKeyMatchingSrcIp != null ? this.getDns().getServices().get(serviceKeyMatchingSrcIp) : null;
-                    String idWithDashes = s != null ? s.getServer() : null;
-                    for (DNSRecord answer : answers) {
-                        if (idWithDashes == null || !answer.getServiceInfo().getKey().contains(idWithDashes) && !answer.getServiceInfo().getKey().contains(idWithDashes.replace("-", ""))) {
-                            toRemove.add(answer);
+                    List<String> serviceServersMatchingSrcIp = new ArrayList<String>(); // with dashes
+                    if (serviceKeysMatchingSrcIp != null) {
+                        for (String serviceKeyMatchingSrcIp: serviceKeysMatchingSrcIp) {
+                            ServiceInfo s = this.getDns().getServices().get(serviceKeyMatchingSrcIp);
+                            if (s != null && s.getServer() != null) serviceServersMatchingSrcIp.add(s.getServer());
                         }
                     }
-                    logger.info("Pruning " + toRemove.size() + " answers for IP " + srcAddress + " out of " + answers.size() + " ; serviceKeyMatchingSrcIp=" + serviceKeyMatchingSrcIp + " ; this.getDns().serviceInfoBySrcIpAddress=" + this.getDns().serviceInfoBySrcIpAddress.keySet().toString() + "-" + this.getDns().serviceInfoBySrcIpAddress.values().toString());
+                    for (DNSRecord answer : answers) {
+                        boolean match = false;
+                        for (String server: serviceServersMatchingSrcIp) {
+                            if (answer.getServiceInfo().getKey().contains(server) || answer.getServiceInfo().getKey().contains(server.replace("-", ""))) {
+                                match = true;
+                            }
+                        }
+                        if (!match) toRemove.add(answer);
+                    }
+                    if (!answers.isEmpty()) logger.info("Pruning " + toRemove.size() + " answers for IP " + srcAddress + " out of " + answers.size() + " ; serviceKeysMatchingSrcIp=" + serviceKeysMatchingSrcIp + " ; this.getDns().serviceInfoBySrcIpAddress=" + this.getDns().serviceInfosBySrcIpAddress.keySet().toString() + "-" + this.getDns().serviceInfosBySrcIpAddress.values().toString());
                     answers.removeAll(toRemove);
                 }
 
@@ -176,7 +185,7 @@ public class Responder extends DNSTask {
                     if (!out.isEmpty()) {
                         if (this.getDns().isUnicast()) {
                             logger.info("Responding to " + _addr.toString() + ":" + _port + " - unicast=" + _unicast + ", incoming=" + _in.toString().replace("\n", " | ") + ", outgoing=" + out.toString().replace("\n", " | "));
-                            logger.info("Should be equal: " + _in.getSrcAddress() + " = " + srcAddress + " -> " + serviceKeyMatchingSrcIp + " = " + this.getDns().serviceInfoBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress)));
+                            logger.info("Should be equal: " + _in.getSrcAddress() + " = " + srcAddress + " -> " + serviceKeysMatchingSrcIp + " = " + this.getDns().serviceInfosBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress)));
                         }
                         this.getDns().send(out);
                     }
