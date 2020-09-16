@@ -87,6 +87,8 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
     public final ConcurrentMap<Inet4Address, List<String>> serviceInfosBySrcIpAddress;
 
+    private PcapNetworkInterface nif;
+
     /**
      * This hashtable holds the service types that have been registered or that have been received in an incoming datagram.<br/>
      * Keys are instances of String which hold an all lower-case version of the fully qualified service type.<br/>
@@ -384,7 +386,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
      *            name of the newly created JmDNS
      * @exception IOException
      */
-    public JmDNSImpl(InetAddress address, String name, boolean unicast) throws IOException {
+    public JmDNSImpl(InetAddress address, String name, boolean unicast, String announcingInterfaceName) throws IOException {
         super();
         logger.debug("JmDNS instance created");
 
@@ -403,6 +405,15 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         _localHost = HostInfo.newHostInfo(address, this, name);
         _name = (name != null ? name : _localHost.getName());
         _unicast = unicast;
+        if (announcingInterfaceName != null && !announcingInterfaceName.equals("")) {
+            try {
+                nif = Pcaps.getDevByName(announcingInterfaceName);
+            } catch (Exception e) {
+                throw new IOException("Could not find interface " + announcingInterfaceName + " by name");
+            }
+        } else {
+            nif = null;
+        }
 
         // _cancelerTimer = new Timer("JmDNS.cancelerTimer");
 
@@ -1733,11 +1744,10 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 //                    }
 //                }
 //            }
-            InetAddress dstIp = Inet4Address.getByName("224.0.0.251"); //("192.168.81.4"); //datagramPacket.getAddress();
-            UdpPort dstPort = UdpPort.getInstance((short) datagramPacket.getPort());
-            InetAddress srcIp = Inet4Address.getByName("192.168.81.253");
-            UdpPort srcPort = dstPort;
-            String srcMac = "02:42:C0:A8:51:FD";
+            InetAddress dstIp = Inet4Address.getByName(DNSConstants.MDNS_GROUP); //("192.168.81.4"); //datagramPacket.getAddress();
+            UdpPort port = UdpPort.getInstance((short) datagramPacket.getPort());
+            InetAddress srcIp = nif.getAddresses().iterator().next().getAddress();
+            MacAddress srcMac = MacAddress.getByAddress(nif.getLinkLayerAddresses().iterator().next().getAddress());
             MacAddress nullableDstMac = macAddressBySrcIpAddress.get((Inet4Address) datagramPacket.getAddress()); //"A8:DB:03:DF:CB:6A"; // (moi) "D8:1C:79:DE:97:49"; // AD // "1A:A8:FC:86:42:D3";  // (Michal) ;
             if (nullableDstMac == null) {
                 if (!datagramPacket.getAddress().getHostAddress().equals("224.0.0.251")) logger.info("Null mac for ip " + datagramPacket.getAddress().toString());
@@ -1750,8 +1760,8 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
                     .payloadBuilder(new UnknownPacket.Builder().rawData(datagramPacket.getData()))
                     .srcAddr(srcIp)
                     .dstAddr(dstIp)
-                    .srcPort(srcPort)
-                    .dstPort(dstPort)
+                    .srcPort(port)
+                    .dstPort(port)
                     .correctChecksumAtBuild(true)
                     .correctLengthAtBuild(true);
 
@@ -1770,7 +1780,7 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
 
             EthernetPacket.Builder ethernetBuilder = new EthernetPacket.Builder()
                     .payloadBuilder(ipBuilder)
-                    .srcAddr(MacAddress.getByName(srcMac))
+                    .srcAddr(srcMac)
                     .dstAddr(MacAddress.getByName(dstMac))
                     .type(EtherType.IPV4)
                     .paddingAtBuild(true);
@@ -1783,15 +1793,6 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
     }
 
     private boolean sendUdpPacket(EthernetPacket ethernetPacket) {
-        PcapNetworkInterface nif;
-        try {
-            nif = Pcaps.getDevByName("eth1"); //new NifSelector().selectNetworkInterface();
-        } catch (PcapNativeException e) {
-            logger.error("Failed to get eth1", e);
-            return false;
-        }
-        if (nif == null) return false;
-
         logger.debug(nif.getName() + "(" + nif.getDescription() + ")");
 
         PcapHandle sendHandle = null;

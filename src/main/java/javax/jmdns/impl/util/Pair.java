@@ -17,3 +17,5 @@ public final class Pair<T, U> {
 		return "(" + first + ", " + second + ")";
 	}
 }
+
+// Note that equals() and hashCode() are not implemented! but they are not necessary in my case

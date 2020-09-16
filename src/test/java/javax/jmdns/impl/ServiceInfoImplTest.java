@@ -23,7 +23,7 @@ public class ServiceInfoImplTest {
     public void test_ip_address_is_set() throws Exception {
         byte[] buf = readFile("a_record_before_srv.bin");
         DNSIncoming msg = new DNSIncoming(new DatagramPacket(buf, buf.length));
-        jmDNS = new JmDNSImpl(null, null, false);
+        jmDNS = new JmDNSImpl(null, null, false, null);
         ServiceInfoImpl serviceInfo = new ServiceInfoImpl(
                 "_ibisip_http._tcp.local.",
                 "DeviceManagementService",

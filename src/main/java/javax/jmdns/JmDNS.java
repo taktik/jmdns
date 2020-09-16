@@ -78,7 +78,7 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create() throws IOException {
-        return new JmDNSImpl(null, null, false);
+        return new JmDNSImpl(null, null, false, null);
     }
 
     /**
@@ -99,7 +99,7 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create(final InetAddress addr) throws IOException {
-        return new JmDNSImpl(addr, null, false);
+        return new JmDNSImpl(addr, null, false, null);
     }
 
     /**
@@ -120,7 +120,7 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create(final String name) throws IOException {
-        return new JmDNSImpl(null, name, false);
+        return new JmDNSImpl(null, name, false, null);
     }
 
     /**
@@ -155,11 +155,11 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create(final InetAddress addr, final String name) throws IOException {
-        return new JmDNSImpl(addr, name, false);
+        return new JmDNSImpl(addr, name, false, null);
     }
 
-    public static JmDNS create(final InetAddress addr, final String name, final boolean unicast) throws IOException {
-        return new JmDNSImpl(addr, name, unicast);
+    public static JmDNS create(final InetAddress addr, final String name, final boolean unicast, final String announcingInterfaceName) throws IOException {
+        return new JmDNSImpl(addr, name, unicast, announcingInterfaceName);
     }
 
     /**
