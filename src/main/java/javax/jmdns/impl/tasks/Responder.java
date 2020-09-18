@@ -149,8 +149,15 @@ public class Responder extends DNSTask {
                     for (DNSRecord answer : answers) {
                         boolean match = false;
                         for (String server: serviceServersMatchingSrcIp) {
-                            if (answer.getServiceInfo().getKey().contains(server) || answer.getServiceInfo().getKey().contains(server.replace("-", ""))) {
+                            if (answer instanceof DNSRecord.IPv4Address && answer.getKey().contains(server)) {
                                 match = true;
+                            }
+                        }
+                        if (serviceKeysMatchingSrcIp != null) {
+                            for (String serviceKey : serviceKeysMatchingSrcIp) {
+                                if (answer.getServiceInfo().getKey().contains(serviceKey)) {
+                                    match = true;
+                                }
                             }
                         }
                         if (!match) toRemove.add(answer);

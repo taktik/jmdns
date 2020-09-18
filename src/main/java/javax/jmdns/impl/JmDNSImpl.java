@@ -1070,6 +1070,11 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
         info.setServer(server);
         info.addAddress(serverIpAddress);
 
+        this.makeServiceNameUnique(info);
+        while (_services.putIfAbsent(info.getKey(), info) != null) {
+            this.makeServiceNameUnique(info);
+        }
+
         macAddressBySrcIpAddress.put(srcAddress, srcMacAddress);
         List<String> serviceKeys = serviceInfosBySrcIpAddress.get(srcAddress);
         if (serviceKeys != null) serviceKeys.add(info.getKey());
@@ -1077,11 +1082,6 @@ public class JmDNSImpl extends JmDNS implements DNSStatefulObject, DNSTaskStarte
             List<String> l = new ArrayList<String>();
             l.add(info.getKey());
             serviceInfosBySrcIpAddress.put(srcAddress, l);
-        }
-
-        this.makeServiceNameUnique(info);
-        while (_services.putIfAbsent(info.getKey(), info) != null) {
-            this.makeServiceNameUnique(info);
         }
 
         this.startProber();
