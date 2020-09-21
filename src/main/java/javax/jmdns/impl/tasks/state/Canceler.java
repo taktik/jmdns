@@ -103,7 +103,6 @@ public class Canceler extends DNSStateTask {
         for (DNSRecord answer : this.getDns().getLocalHost().answers(DNSRecordClass.CLASS_ANY, DNSRecordClass.UNIQUE, this.getTTL())) {
             newOut = this.addAnswer(newOut, null, answer);
         }
-        //newOut.setDestination(new InetSocketAddress("192.168.81.42", 5353));
         return newOut;
     }
 
@@ -117,8 +116,6 @@ public class Canceler extends DNSStateTask {
         for (DNSRecord answer : info.answers(DNSRecordClass.CLASS_ANY, DNSRecordClass.UNIQUE, this.getTTL(), this.getDns().getLocalHost())) {
             newOut = this.addAnswer(newOut, null, answer);
         }
-        //if (info.getInet4Addresses().length > 0) newOut.setDestination(new InetSocketAddress(info.getInetAddresses()[0], 5353));
-        //newOut.setDestination(new InetSocketAddress("192.168.81.42", 5353));
         return newOut;
     }
 

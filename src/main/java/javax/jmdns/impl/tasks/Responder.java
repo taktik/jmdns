@@ -103,8 +103,10 @@ public class Responder extends DNSTask {
     @Override
     public void run() {
         this.getDns().respondToQuery(_in);
+        // Store source information because it might change later
         String srcAddress = _in.getSrcAddress();
         int srcPort = _in.getSrcPort();
+
         // We use these sets to prevent duplicate records
         Set<DNSQuestion> questions = new HashSet<DNSQuestion>();
         Set<DNSRecord> answers = new HashSet<DNSRecord>();
@@ -124,7 +126,7 @@ public class Responder extends DNSTask {
                     question.addAnswers(this.getDns(), answers);
                 }
 
-                if (this.getDns().isUnicast()) logger.info("Found " + answers.size() + " answers for IP " + srcAddress);
+                if (this.getDns().isUnicast()) logger.debug("Found " + answers.size() + " answers for IP " + srcAddress);
 
                 // remove known answers, if the TTL is at least half of the correct value. (See Draft Cheshire chapter 7.1.).
                 long now = System.currentTimeMillis();
@@ -135,7 +137,7 @@ public class Responder extends DNSTask {
                     }
                 }
 
-                // Remove answers from services that are not paired to that IP (could be better to just not add them at all!)
+                // Remove answers from services that are not paired to that IP (could be better to just not add them at all)
                 List<String> serviceKeysMatchingSrcIp = this.getDns().serviceInfosBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress));
                 if (this.getDns().isUnicast()) {
                     List<DNSRecord> toRemove = new ArrayList<DNSRecord>();
@@ -162,7 +164,7 @@ public class Responder extends DNSTask {
                         }
                         if (!match) toRemove.add(answer);
                     }
-                    if (!answers.isEmpty()) logger.info("Pruning " + toRemove.size() + " answers for IP " + srcAddress + " out of " + answers.size() + " ; serviceKeysMatchingSrcIp=" + serviceKeysMatchingSrcIp + " ; this.getDns().serviceInfoBySrcIpAddress=" + this.getDns().serviceInfosBySrcIpAddress.keySet().toString() + "-" + this.getDns().serviceInfosBySrcIpAddress.values().toString());
+                    if (!answers.isEmpty()) logger.info("Pruning " + toRemove.size() + "/" + answers.size() + " answers for IP " + srcAddress + " (matching services = " + serviceKeysMatchingSrcIp + ")");
                     answers.removeAll(toRemove);
                 }
 
@@ -176,7 +178,6 @@ public class Responder extends DNSTask {
                     } else if (_unicast) {
                         out.setDestination(new InetSocketAddress(_addr, _port)); // this does not seem to work, _addr and _port are supposed to be the source but seem to be the multicast destination
                     }
-                    //out.setDestination(new InetSocketAddress("192.168.81.42", 5353));
                     out.setId(_in.getId());
                     for (DNSQuestion question : questions) {
                         if (question != null) {
@@ -190,10 +191,6 @@ public class Responder extends DNSTask {
                         }
                     }
                     if (!out.isEmpty()) {
-                        if (this.getDns().isUnicast()) {
-                            logger.info("Responding to " + _addr.toString() + ":" + _port + " - unicast=" + _unicast + ", incoming=" + _in.toString().replace("\n", " | ") + ", outgoing=" + out.toString().replace("\n", " | "));
-                            logger.info("Should be equal: " + _in.getSrcAddress() + " = " + srcAddress + " -> " + serviceKeysMatchingSrcIp + " = " + this.getDns().serviceInfosBySrcIpAddress.get((Inet4Address) Inet4Address.getByName(srcAddress)));
-                        }
                         this.getDns().send(out);
                     }
                 }

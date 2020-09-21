@@ -44,17 +44,6 @@ The project was originally started in December 2002 by Arthur van Hoff at Strang
 			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
 		</license>
 	</licenses>
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>com.ardikars.pcap</groupId>
-				<artifactId>pcap</artifactId>
-				<version>0.1.7</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -74,17 +63,8 @@ The project was originally started in December 2002 by Arthur van Hoff at Strang
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.ardikars.pcap</groupId>
-			<artifactId>pcap-codec</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>org.pcap4j</groupId>
 			<artifactId>pcap4j-core</artifactId>
-			<version>1.8.2</version>
-		</dependency>
-		<dependency>
-			<groupId>org.pcap4j</groupId>
-			<artifactId>pcap4j-packetfactory-static</artifactId>
 			<version>1.8.2</version>
 		</dependency>
 	</dependencies>

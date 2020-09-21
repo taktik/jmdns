@@ -78,7 +78,7 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create() throws IOException {
-        return new JmDNSImpl(null, null, false, null);
+        return new JmDNSImpl(null, null, null);
     }
 
     /**
@@ -99,7 +99,7 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create(final InetAddress addr) throws IOException {
-        return new JmDNSImpl(addr, null, false, null);
+        return new JmDNSImpl(addr, null, null);
     }
 
     /**
@@ -120,7 +120,7 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create(final String name) throws IOException {
-        return new JmDNSImpl(null, name, false, null);
+        return new JmDNSImpl(null, name, null);
     }
 
     /**
@@ -155,11 +155,14 @@ public abstract class JmDNS implements Closeable {
      *                if an exception occurs during the socket creation
      */
     public static JmDNS create(final InetAddress addr, final String name) throws IOException {
-        return new JmDNSImpl(addr, name, false, null);
+        return new JmDNSImpl(addr, name, null);
     }
 
-    public static JmDNS create(final InetAddress addr, final String name, final boolean unicast, final String announcingInterfaceName) throws IOException {
-        return new JmDNSImpl(addr, name, unicast, announcingInterfaceName);
+    /**
+     * Same as previous constructor, but with additional [unicastInterfaceName] if you want to register services with unicast-only responses on that interface
+     */
+    public static JmDNS create(final InetAddress addr, final String name, final String unicastInterfaceName) throws IOException {
+        return new JmDNSImpl(addr, name, unicastInterfaceName);
     }
 
     /**
