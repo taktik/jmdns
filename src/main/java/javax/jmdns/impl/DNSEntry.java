@@ -23,7 +23,7 @@ public abstract class DNSEntry {
     // private static Logger logger = LoggerFactory.getLogger(DNSEntry.class.getName());
     private final String         _key;
 
-    private final String         _name;
+    private String         _name;
 
     private final String         _type;
 
@@ -124,6 +124,9 @@ public abstract class DNSEntry {
      */
     public String getName() {
         return (_name != null ? _name : "");
+    }
+    public void setName(String name) {
+        this._name = name;
     }
 
     /**

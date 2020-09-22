@@ -4,21 +4,17 @@
 
 package javax.jmdns.impl.tasks;
 
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.*;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.jmdns.ServiceInfo;
-import javax.jmdns.impl.DNSIncoming;
-import javax.jmdns.impl.DNSOutgoing;
-import javax.jmdns.impl.DNSQuestion;
-import javax.jmdns.impl.DNSRecord;
-import javax.jmdns.impl.JmDNSImpl;
+import javax.jmdns.impl.*;
 import javax.jmdns.impl.constants.DNSConstants;
+import javax.jmdns.impl.constants.DNSRecordType;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.*;
 
 /**
  * The Responder sends a single answer for the specified service infos and for the host name.
@@ -110,11 +106,12 @@ public class Responder extends DNSTask {
         // We use these sets to prevent duplicate records
         Set<DNSQuestion> questions = new HashSet<DNSQuestion>();
         Set<DNSRecord> answers = new HashSet<DNSRecord>();
+        Collection<? extends DNSQuestion> inQuestions = _in.getQuestions();
 
         if (this.getDns().isAnnounced()) {
             try {
                 // Answer questions
-                for (DNSQuestion question : _in.getQuestions()) {
+                for (DNSQuestion question : inQuestions) {
                     logger.debug("{}.run() JmDNS responding to: {}", this.getName(), question);
 
                     // for unicast responses the question must be included
@@ -186,12 +183,29 @@ public class Responder extends DNSTask {
                     }
                     for (DNSRecord answer : answers) {
                         if (answer != null) {
-                            out = this.addAnswer(out, _in, answer);
-
+                            if (answer.getRecordType().equals(DNSRecordType.TYPE_PTR)) out = this.addAnswer(out, _in, answer);
+                            else out = this.addAdditionalAnswer(out, _in, answer);
                         }
                     }
                     if (!out.isEmpty()) {
                         this.getDns().send(out);
+
+                        if (this.getDns().isUnicast()) {
+                            // Add other answers for e.g. _233637DE._sub._googlecast._tcp.local
+                            if (out.getAnswers().iterator().hasNext()) {
+                                DNSRecord baseAnswer = out.getAnswers().iterator().next();
+                                for (DNSQuestion question : inQuestions) {
+                                    if (question.getName().contains("._sub._googlecast._tcp") && !question.getName().startsWith("_%")) {
+                                        out.getAnswers().clear();
+                                        baseAnswer.setName(question.getName());
+                                        out.addAnswer(_in, baseAnswer);
+                                        this.getDns().send(out);
+                                    }
+                                }
+                            } else {
+                                logger.warn("No subAnswer found");
+                            }
+                        }
                     }
                 }
                 // this.cancel();
