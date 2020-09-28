@@ -161,7 +161,7 @@ public class Responder extends DNSTask {
                         }
                         if (!match) toRemove.add(answer);
                     }
-                    if (!answers.isEmpty()) logger.info("Pruning " + toRemove.size() + "/" + answers.size() + " answers for IP " + srcAddress + " (matching services = " + serviceKeysMatchingSrcIp + ")");
+                    if (answers.size() - toRemove.size() > 0) logger.debug("Pruning " + toRemove.size() + "/" + answers.size() + " answers for IP " + srcAddress + " (matching services = " + serviceKeysMatchingSrcIp + ")");
                     answers.removeAll(toRemove);
                 }
 
